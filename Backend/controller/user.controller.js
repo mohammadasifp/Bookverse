@@ -1,12 +1,29 @@
 import User from "../model/user.model.js";
 import bcryptjs from "bcryptjs";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
+
+
 export const signup = async(req, res) => {
     try {
         console.log(req.body); // Debugging line
         const { fullname, email, password } = req.body;
+        
+        // check fullname length
+        if (fullname.length < 4) {
+            return res.status(400).json({ message: "fullname length should be grether than 3" });
+        }
+
+        // check User email already exists
         const user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({ message: "User already exists" });
+        }
+
+        // check password length
+        if ( password.length <= 6 ){
+            return res.status(400).json({ message: "password  length should be grether than 6" });
         }
         const hashPassword = await bcryptjs.hash(password, 10);
         const createdUser = new User({
@@ -36,17 +53,31 @@ export const login = async(req, res) => {
         if (!user || !isMatch) {
             return res.status(400).json({ message: "Invalid username or password" });
         } else {
+            const authClaims = [
+                {name:user.fullname},{role:user.role},
+            ]
+            // ✅ Corrected JWT Payload Structure
+            const token = jwt.sign(
+                { id: user._id, fullname: user.fullname, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: "30d" }
+            );
+    
             res.status(200).json({
                 message: "Login successful",
+                token, // ✅ make sure this is here!
                 user: {
-                    _id: user._id,
-                    fullname: user.fullname,
-                    email: user.email,
+                  _id: user._id,
+                  fullname: user.fullname,
+                  email: user.email,
+                  role: user.role,
                 },
-            });
+              });
+              
         }
-    } catch (error) {
+    } 
+    catch (error) {
         console.log("Error: " + error.message);
         res.status(500).json({ message: "Internal server error" });
     }
-};
+}
